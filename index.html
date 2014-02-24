@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="utf-8">
+        <meta http-equiv="X-UA-Compatible" content="IE=edge">
+        <title>Share Click Test</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+        <script src="http://mlkcca.com/js/v2/milkcocoa.js"></script>
+            <script>
+            $(function() {
+            	var milkcocoa = new MilkCocoa("https://mlkcca.com:3000", "mlkdev-0003", function() {});
+            	var ds = milkcocoa.DataStore('memo');
+            	ds.query({}).limit(20).done(function(e) {
+            		for(var i=0;i < e.length;i++) {
+                		create_memo(e[i].x, e[i].y, e[i].text);
+            		}
+            	})
+            	ds.on('push', function(pushed) {
+            		create_memo(pushed.x, pushed.y, pushed.text);
+            	});
+            	function create_memo(x, y, text) {
+            		var cursor = document.createElement('p');
+            		cursor.style.position = 'absolute';
+            		cursor.style.left = x + 'px';
+            		cursor.style.top = y + 'px';
+            		cursor.innerHTML = htmlEscape(text);
+            		var objBody = document.getElementsByTagName("body").item(0);
+            		objBody.appendChild(cursor);
+            	}
+            	window.document.onmousedown = function(e) {
+            		var text = prompt("メモを入力してください。");
+            		if(!text) {
+            			return;
+            		}
+            		ds.push({
+            			x : e.x,
+            			y : e.y,
+            			text : htmlEscape(text)
+            		}, function() {
+            			
+            		});
+            	}
+            	function htmlEscape(s){
+            		s=s.replace(/&/g,'&amp;');
+            		s=s.replace(/>/g,'&gt;');
+            		s=s.replace(/</g,'&lt;');
+            		return s;
+            	}
+            });
+                </script>
+    </head>
+    <body>
+    </body>
+</html>
