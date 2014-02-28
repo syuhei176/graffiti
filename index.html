@@ -3,32 +3,138 @@
     <head>
         <meta charset="utf-8">
         <meta http-equiv="X-UA-Compatible" content="IE=edge">
-        <title>Share Click Test</title>
+        <title>付箋アプリ</title>
         <meta name="viewport" content="width=device-width, initial-scale=1">
+        <style>
+.husen {
+	width: 200px;
+	height: 40px;
+	line-height: 40px;
+	position: relative;
+	background: #f0f0f0; /* 付箋の色 */
+}
+.husen:after {
+	width: 170px;
+	height: 35px;
+	content: "";
+	position: absolute;
+	top: 0;
+	right: 2px;
+	/* ぼかし */
+	-moz-box-shadow: 0 5px 5px #999; /* Firefox */
+	-webkit-box-shadow: 0 5px 5px #999; /* Safari and Chrome */
+	box-shadow: 0 5px 5px #999;
+	/* 回転 */
+	-moz-transform: rotate(3deg); /* FireFox */
+	-webkit-transform: rotate(3deg); /* Safari and Chrome */
+	-o-transform: rotate(3deg); /* Opera */
+	-ms-transform: rotate(3deg); /* IE */
+	transform: rotate(3deg);
+	z-index: -1;
+}
+        </style>
         <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
-        <script src="http://mlkcca.com/js/v2/milkcocoa.js"></script>
+        <script src="js/snap.svg-min.js"></script>
+        <script src="http://cdn.mlkcca.com/v2/milkcocoa.js"></script>
             <script>
             $(function() {
-            	var milkcocoa = new MilkCocoa("https://mlkcca.com:3000", "mlkdev-0003", function() {});
+            	var milkcocoa = new MilkCocoa("https://mlkcca.com", "mlkdev-0003", function() {});
             	var ds = milkcocoa.DataStore('memo');
-            	ds.query({}).limit(20).done(function(e) {
+            	var snap = Snap('svg');
+            	
+            	var background = snap.rect(0, 0, 800, 600);
+            	background.attr({
+            	    fill: "#ffffff",
+            	    "fill-opacity" : 0,
+            	});
+            	var g = snap.filter(Snap.filter.shadow(0, 2, 3));
+            	function Fusen(_id, text) {
+            		var id = _id;
+            		var group = snap.g();
+                	var rect = snap.rect(0, 0, 200, 50);
+                	var text = snap.text(5, 25, text);
+                	var cross = snap.rect(178, 0, 22, 22);
+                	var p1 = snap.line(180,0,200,20);
+                	var p2 = snap.line(200,0,180,20);
+                	group.append(rect);
+                	group.append(text);
+                	group.append(cross);
+                	group.append(p1);
+                	group.append(p2);
+                	rect.attr({
+                		filter : g,
+                		fill : '#f0f0f0'
+                	});
+                	text.attr({
+                		stroke : '#000000'
+                	})
+                	cross.attr({
+                		fill : '#e0e0e0'
+                	})
+                	p1.attr({
+                		stroke : '#ffffff',
+                		strokeWidth : 5
+                	})
+                	p2.attr({
+                		stroke : '#ffffff',
+                		strokeWidth : 5
+                	})
+                	var pos = {x : 0, y : 0};
+                	var prev_pos = {x : 0, y : 0};
+                	group.drag(function(dx, dy, x, y, e){
+                		setPos(pos.x + dx - prev_pos.x, pos.y + dy - prev_pos.y);
+                		prev_pos.x = dx;
+                		prev_pos.y = dy;
+                	}, function(x, y, e) {
+                		prev_pos.x = 0;
+                		prev_pos.y = 0;
+                	}, function() {
+                		if(prev_pos.x == 0 && prev_pos.y == 0) return;
+                		ds.child(id).set({
+                			x : pos.x,
+                			y : pos.y
+                		}, function() {});
+                	});
+                	cross.click(function() {
+                		ds.child(id).remove(function() {});
+                	});
+                	function setPos(x, y) {
+                		pos.x = x;
+                		pos.y = y;
+            			group.transform('translate('+x+','+y+')');
+                	}
+                	function removeSelf() {
+                		group.remove();
+                	}
+                	return {
+                		setPos : setPos,
+                		removeSelf : removeSelf
+                	}
+            	}
+            	ds.query({}).limit(30).done(function(e) {
             		for(var i=0;i < e.length;i++) {
-                		create_memo(e[i].x, e[i].y, e[i].text);
+                		create_memo(e[i].id, e[i].x, e[i].y, e[i].text);
             		}
             	})
             	ds.on('push', function(pushed) {
-            		create_memo(pushed.x, pushed.y, pushed.text);
+            		create_memo(pushed.id, pushed.x, pushed.y, pushed.text);
             	});
-            	function create_memo(x, y, text) {
-            		var cursor = document.createElement('p');
-            		cursor.style.position = 'absolute';
-            		cursor.style.left = x + 'px';
-            		cursor.style.top = y + 'px';
-            		cursor.innerHTML = htmlEscape(text);
-            		var objBody = document.getElementsByTagName("body").item(0);
-            		objBody.appendChild(cursor);
+            	ds.on('set', function(_setted) {
+            		var setted = _setted.updates[0];
+            		fusen_set[setted.id].setPos(setted.params.x, setted.params.y);
+            	});
+            	ds.on('remove', function(_removed) {
+            		var removed = _removed.value;
+            		fusen_set[removed.id].removeSelf();
+            		delete fusen_set[removed.id];
+            	});
+            	var fusen_set = {};
+            	function create_memo(id, x, y, text) {
+            		var fusen = new Fusen(id, text);
+            		fusen.setPos(x, y);
+            		fusen_set[id] = fusen;
             	}
-            	window.document.onmousedown = function(e) {
+            	background.mousedown(function(e) {
             		var text = prompt("メモを入力してください。");
             		if(!text) {
             			return;
@@ -40,7 +146,7 @@
             		}, function() {
             			
             		});
-            	}
+            	})
             	function htmlEscape(s){
             		s=s.replace(/&/g,'&amp;');
             		s=s.replace(/>/g,'&gt;');
@@ -51,5 +157,6 @@
                 </script>
     </head>
     <body>
+      <svg></svg>
     </body>
 </html>
